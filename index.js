@@ -92,10 +92,9 @@ server.use("/brands",isAuth(), brandsRouter.router);
 server.use("/users",isAuth(), usersRouter.router);
 server.use("/auth", authRouter.router);
 server.use("/cart",isAuth(), cartRouter.router);
-//this /orders is clashing with react /orders
 server.use("/orders",isAuth(), ordersRouter.router);
 //this line we add to make router work in case of other routes doesnt match
-server.get('*',(req,res)=>res.sendFile(path.resolve('build',('index.html'))))
+server.get('*',(req,res)=>res.sendFile(path.resolve('build','index.html')))
 
 main().catch((err) => console.log(err));
 
@@ -173,7 +172,7 @@ passport.deserializeUser(function (user, cb) {
 const stripe = require("stripe")(process.env.STRIPE_SERVER_KEY);
 
 server.post("/create-payment-intent",async(req,res)=>{
-  const {totalAmount} = req.body
+  const {totalAmount,orderId} = req.body
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount:totalAmount*100,
@@ -182,6 +181,9 @@ server.post("/create-payment-intent",async(req,res)=>{
     automatic_payment_methods: {
       enabled: true,
     },
+    metadata:{
+      orderId
+    }
   });
 
   res.send({
