@@ -1,16 +1,19 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
-const orderSchema = new Schema({
-  items: { type: [Schema.Types.Mixed], require: true },
-  totalAmount: { type: Number },
-  totalItems: { type: Number },
-  user: { type: Schema.Types.ObjectId, ref: "User", required: true },
-  paymentMethod: { type: String, require: true },
-  paymentStatus: { type: String, default: "pending" },
-  status: { type: String, default: "pending" },
-  selectedAddress:{ type: Schema.Types.Mixed, require: true },
-});
+const orderSchema = new Schema(
+  {
+    items: { type: [Schema.Types.Mixed], require: true },
+    totalAmount: { type: Number },
+    totalItems: { type: Number },
+    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    paymentMethod: { type: String, require: true },
+    paymentStatus: { type: String, default: "pending" },
+    status: { type: String, default: "pending" },
+    selectedAddress: { type: Schema.Types.Mixed, require: true },
+  },
+  { timestamps: true }
+);
 const virtual = orderSchema.virtual("id");
 virtual.get(function () {
   return this._id;

@@ -1,9 +1,8 @@
-
 const express = require("express");
 const server = express();
 const mongoose = require("mongoose");
 const productsRouter = require("./routes/Products");
-const cookieParser = require('cookie-parser');
+const cookieParser = require("cookie-parser");
 const categoriesRouter = require("./routes/Category");
 const brandsRouter = require("./routes/Brands");
 const usersRouter = require("./routes/Users");
@@ -19,12 +18,15 @@ const crypto = require("crypto");
 var jwt = require("jsonwebtoken");
 const JwtStrategy = require("passport-jwt").Strategy;
 const ExtractJwt = require("passport-jwt").ExtractJwt;
-require('dotenv').config()
+require("dotenv").config();
 const { isAuth, sanitizeUser, cookieExtractor } = require("./services/common");
-const path = require('path');
+const path = require("path");
 const { Order } = require("./model/Order");
 
 // console.log(process.env);
+
+//Email
+
 
 //JWT options
 
@@ -32,49 +34,51 @@ const { Order } = require("./model/Order");
 
 //TODO:we will capture actual order after deploying out server live on public URL
 
-const endpointSecret =process.env.ENDPOINT_SECRET;
+const endpointSecret = process.env.ENDPOINT_SECRET;
 
-server.post('/webhook', express.raw({type: 'application/json'}), async(request, response) => {
-  const sig = request.headers['stripe-signature'];
+server.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  async (request, response) => {
+    const sig = request.headers["stripe-signature"];
 
-  let event;
+    let event;
 
-  try {
-    event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
+    try {
+      event = stripe.webhooks.constructEvent(request.body, sig, endpointSecret);
+    } catch (err) {
+      response.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Handle the event
+    switch (event.type) {
+      case "payment_intent.succeeded":
+        const paymentIntentSucceeded = event.data.object;
+
+        const order = await Order.findById(
+          paymentIntentSucceeded.metadata.orderId
+        );
+        order.paymentStatus = "received";
+        await order.save();
+
+        break;
+
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    // Return a response to acknowledge receipt of the event
+    response.send();
   }
-  catch (err) {
-    response.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  // Handle the event
-  switch (event.type) {
-    case 'payment_intent.succeeded':
-      const paymentIntentSucceeded = event.data.object;
-      
-      const order = await Order.findById(
-        paymentIntentSucceeded.metadata.orderId
-      )
-      order.paymentStatus = 'received'
-      await order.save();
-      
-      break;
-
-    default:
-      console.log(`Unhandled event type ${event.type}`);
-  }
-
-  // Return a response to acknowledge receipt of the event
-  response.send();
-});
-
+);
 
 const opts = {};
 opts.jwtFromRequest = cookieExtractor;
-opts.secretOrKey =process.env.JWT_SECRET_KEY; //TODO:should not be in code
+opts.secretOrKey = process.env.JWT_SECRET_KEY; //TODO:should not be in code
 
 //middlewares
-server.use(express.static(path.resolve(__dirname,'build')))
-server.use(cookieParser())
+server.use(express.static(path.resolve(__dirname, "build")));
+server.use(cookieParser());
 server.use(
   session({
     secret: process.env.SESSION_KEY,
@@ -94,14 +98,17 @@ server.use(
 server.use(express.json()); //to parse req.body
 
 server.use("/products", isAuth(), productsRouter.router); //we can also use JWT token for client-only auth
-server.use("/categories",isAuth(), categoriesRouter.router);
-server.use("/brands",isAuth(), brandsRouter.router);
-server.use("/users",isAuth(), usersRouter.router);
+server.use("/categories", isAuth(), categoriesRouter.router);
+server.use("/brands", isAuth(), brandsRouter.router);
+server.use("/users", isAuth(), usersRouter.router);
 server.use("/auth", authRouter.router);
-server.use("/cart",isAuth(), cartRouter.router);
-server.use("/orders",isAuth(), ordersRouter.router);
+server.use("/cart", isAuth(), cartRouter.router);
+server.use("/orders", isAuth(), ordersRouter.router);
+
 //this line we add to make router work in case of other routes doesnt match
-server.get('*',(req,res)=>res.sendFile(path.resolve('build','index.html')))
+server.get("*", (req, res) =>
+  res.sendFile(path.resolve("build", "index.html"))
+);
 
 main().catch((err) => console.log(err));
 
@@ -115,9 +122,9 @@ passport.use(
     done
   ) {
     try {
-      const user = await User.findOne({ email: email })
-      console.log(email,password,user);
-      
+      const user = await User.findOne({ email: email });
+      console.log(email, password, user);
+
       if (!user) {
         done(null, false, { message: "invelid credentials " });
       }
@@ -131,8 +138,11 @@ passport.use(
           if (!crypto.timingSafeEqual(user.password, hashedPassword)) {
             return done(null, false, { message: "invelid credentials" });
           }
-          const token = jwt.sign(sanitizeUser(user),  process.env.JWT_SECRET_KEY);
-          done(null, {id:user.id,role:user.role,token}); //this lines sends to serializer
+          const token = jwt.sign(
+            sanitizeUser(user),
+            process.env.JWT_SECRET_KEY
+          );
+          done(null, { id: user.id, role: user.role, token }); //this lines sends to serializer
         }
       );
     } catch (error) {
@@ -175,29 +185,28 @@ passport.deserializeUser(function (user, cb) {
   });
 });
 
-//payments 
+//payments
 const stripe = require("stripe")(process.env.STRIPE_SERVER_KEY);
 
-server.post("/create-payment-intent",async(req,res)=>{
-  const {totalAmount,orderId} = req.body
+server.post("/create-payment-intent", async (req, res) => {
+  const { totalAmount, orderId } = req.body;
 
   const paymentIntent = await stripe.paymentIntents.create({
-    amount:totalAmount*100,
+    amount: totalAmount * 100,
     currency: "usd",
     // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
     automatic_payment_methods: {
       enabled: true,
     },
-    metadata:{
-      orderId
-    }
+    metadata: {
+      orderId,
+    },
   });
 
   res.send({
     clientSecret: paymentIntent.client_secret,
   });
-})
-
+});
 
 async function main() {
   await mongoose.connect(process.env.MONGODB_URL);
