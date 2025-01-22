@@ -1,4 +1,5 @@
 const { Order } = require("../model/Order");
+const { Product } = require("../model/Product");
 const { User } = require("../model/User");
 const { sendMail, invoiceTemplate } = require("../services/common");
 
@@ -17,11 +18,15 @@ exports.fatchOrdersByUser = async (req, res) => {
 
 
 exports.createOrder = async(req, res) => {
-  //this product we have to get from API body
-
 
   const order = new Order(req.body);
-  console.log(order);
+  //here we have to update stocks.
+  for(let item of order.items){
+    let product = await Product.findOne({_id:item.product.id})
+    product.$inc('stock',-1*item.quantity)
+    //for optimum performance we should make inventory outside of product.
+    await product.save()
+  }
   try{
     const doc = await order.save();
     const user =await User.findById(order.user)

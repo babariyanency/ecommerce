@@ -6,6 +6,7 @@ const userSchema = new Schema({
     password:{type:Buffer,required:true},
     role:{type:String,required:true,default:'user'},
     addresses:{type:[Schema.Types.Mixed]},
+    //for addressesm we can make a sepearate Schema like order. but in this case we are fine 
     name:{type:String},
     salt:Buffer,
     resetPasswordToken: {type: String, default:''}
